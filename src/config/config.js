@@ -76,6 +76,7 @@ export default {
     enabled: process.env.COMPRESSION_ENABLED === 'true' || true,
     level: parseInt(process.env.COMPRESSION_LEVEL) || 6, // 1-9, 6 es el default de zlib
     threshold: parseInt(process.env.COMPRESSION_THRESHOLD) || 1024, // Comprimir solo si es mayor a 1KB
+    ttl: parseInt(process.env.TTL_EXPIRATION) || 3600,
   },
 
   // Configuración de detección de duplicados
@@ -83,6 +84,7 @@ export default {
     enabled: process.env.DUPLICATE_DETECTION === 'true' || true,
     timeThreshold: parseInt(process.env.DUPLICATE_TIME_THRESHOLD) || 1000, // 1 segundo
     coordinateThreshold: parseFloat(process.env.DUPLICATE_COORDINATE_THRESHOLD) || 0.0001, // ~10 metros
+    maxCacheSize: parseInt(process.env.CACHE_DATA) || 1000
   },
 
   // Configuración de limpieza automática
@@ -136,5 +138,9 @@ export default {
     port: parseInt(process.env.HEALTH_CHECK_PORT) || 8080,
     path: process.env.HEALTH_CHECK_PATH || '/health',
     timeout: parseInt(process.env.HEALTH_CHECK_TIMEOUT) || 5000,
-  }
+  },
+
+  metadata: process.env.CREATE_METADATA === 'true',
+
+  backup: process.env.SAVE_COMPRESSED_BACKUP === 'true',
 };

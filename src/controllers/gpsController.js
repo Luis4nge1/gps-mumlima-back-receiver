@@ -1,6 +1,5 @@
 import express from 'express';
-import GpsService from '../services/GpsService.js';
-import { getQueuesStats } from '../queues/gpsQueues.js';
+import GpsProcessingService from '../services/GpsProcessingService.js';
 import logger from '../utils/logger.js';
 import { AppError } from '../errors/AppError.js';
 import { validateGpsData, validateBatchGpsData } from '../validators/gpsValidator.js';
@@ -25,8 +24,8 @@ router.post('/position', async (req, res) => {
       });
     }
 
-    // Procesar posición GPS (se encola para batch processing)
-    const result = await GpsService.processGpsPosition({
+    // Procesar posición GPS usando el nuevo servicio modular
+    const result = await GpsProcessingService.processPosition({
       id,
       lat,
       lng,
@@ -36,20 +35,12 @@ router.post('/position', async (req, res) => {
     logger.info('GPS position received', {
       deviceId: id,
       processed: result.processed,
-      queued: result.queued,
-      duplicate: result.duplicate,
-      batchSize: result.batchSize
+      duplicate: result.duplicate
     });
 
     res.status(200).json({
       success: true,
-      data: {
-        deviceId: id,
-        processed: result.processed,
-        queued: result.queued,
-        duplicate: result.duplicate,
-        message: result.duplicate ? 'Position was duplicate' : 'Position queued for processing'
-      }
+      data: result
     });
 
   } catch (error) {
@@ -98,8 +89,8 @@ router.post('/batch', async (req, res) => {
       });
     }
 
-    // Procesar lote de posiciones GPS
-    const results = await GpsService.processBatchGpsPositions(positions);
+    // Procesar lote de posiciones GPS usando el nuevo servicio modular
+    const results = await GpsProcessingService.processBatch(positions);
 
     logger.info('GPS batch processed', {
       totalPositions: positions.length,
@@ -110,13 +101,7 @@ router.post('/batch', async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: {
-        totalPositions: positions.length,
-        processed: results.processed,
-        duplicates: results.duplicates,
-        errors: results.errors,
-        message: `Processed ${results.processed} positions, ${results.duplicates} duplicates, ${results.errors} errors`
-      }
+      data: results
     });
 
   } catch (error) {
@@ -155,7 +140,7 @@ router.get('/device/:deviceId/last', async (req, res) => {
       });
     }
 
-    const lastPosition = await GpsService.getLastPosition(deviceId);
+    const lastPosition = await GpsProcessingService.getLastPosition(deviceId);
 
     if (!lastPosition) {
       return res.status(404).json({
@@ -195,18 +180,11 @@ router.get('/device/:deviceId/last', async (req, res) => {
  */
 router.get('/stats', async (req, res) => {
   try {
-    const [queueStats, batchStats] = await Promise.all([
-      getQueuesStats(),
-      GpsService.getBatchStats()
-    ]);
+    const systemStats = await GpsProcessingService.getSystemStats();
 
     res.status(200).json({
       success: true,
-      data: {
-        queues: queueStats,
-        batches: batchStats,
-        timestamp: new Date().toISOString()
-      }
+      data: systemStats
     });
 
   } catch (error) {
@@ -227,7 +205,7 @@ router.get('/stats', async (req, res) => {
  */
 router.post('/force-batch-processing', async (req, res) => {
   try {
-    await GpsService.forceBatchProcessing();
+    await GpsProcessingService.forceBatchProcessing();
 
     logger.info('Batch processing forced');
 
@@ -240,6 +218,13 @@ router.post('/force-batch-processing', async (req, res) => {
     logger.error('Error forcing batch processing', {
       error: error.message
     });
+
+    if (error instanceof AppError) {
+      return res.status(error.statusCode).json({
+        success: false,
+        error: error.message
+      });
+    }
 
     res.status(500).json({
       success: false,
@@ -254,7 +239,7 @@ router.post('/force-batch-processing', async (req, res) => {
  */
 router.delete('/batches', async (req, res) => {
   try {
-    GpsService.clearBatches();
+    GpsProcessingService.clearBatches();
 
     logger.info('Batches cleared');
 
@@ -275,36 +260,67 @@ router.delete('/batches', async (req, res) => {
   }
 });
 
+
+
+/**
+ * Endpoint para obtener múltiples últimas posiciones
+ * POST /api/gps/devices/last-positions
+ */
+router.post('/devices/last-positions', async (req, res) => {
+  try {
+    const { deviceIds } = req.body;
+
+    if (!Array.isArray(deviceIds) || deviceIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Device IDs array is required and must not be empty'
+      });
+    }
+
+    const positions = await GpsProcessingService.getLastPositions(deviceIds);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        positions,
+        requestedCount: deviceIds.length,
+        foundCount: positions.length
+      }
+    });
+
+  } catch (error) {
+    logger.error('Error retrieving multiple last positions', {
+      error: error.message,
+      deviceCount: req.body?.deviceIds?.length
+    });
+
+    if (error instanceof AppError) {
+      return res.status(error.statusCode).json({
+        success: false,
+        error: error.message
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
+    });
+  }
+});
+
 /**
  * Endpoint de health check
  * GET /api/gps/health
  */
 router.get('/health', async (req, res) => {
   try {
-    const batchStats = GpsService.getBatchStats();
-    const queueStats = await getQueuesStats();
+    const health = await GpsProcessingService.healthCheck();
 
-    const health = {
-      status: 'healthy',
-      timestamp: new Date().toISOString(),
-      batches: {
-        historical: batchStats.historicalBatchSize,
-        latest: batchStats.latestPositionsCount
-      },
-      queues: {
-        historical: {
-          waiting: queueStats.historical.waiting,
-          active: queueStats.historical.active
-        },
-        latest: {
-          waiting: queueStats.latest.waiting,
-          active: queueStats.latest.active
-        }
-      }
-    };
+    const statusCode = health.status === 'healthy' ? 200 : 
+                      health.status === 'degraded' ? 200 : 503;
 
-    res.status(200).json({
-      success: true,
+    res.status(statusCode).json({
+      success: health.status !== 'unhealthy',
       data: health
     });
 
@@ -315,9 +331,43 @@ router.get('/health', async (req, res) => {
 
     res.status(503).json({
       success: false,
-      status: 'unhealthy',
-      error: error.message,
-      timestamp: new Date().toISOString()
+      data: {
+        status: 'unhealthy',
+        error: error.message,
+        timestamp: new Date().toISOString()
+      }
+    });
+  }
+});
+
+/**
+ * Endpoint para realizar limpieza del sistema
+ * POST /api/gps/cleanup
+ */
+router.post('/cleanup', async (req, res) => {
+  try {
+    await GpsProcessingService.performCleanup();
+
+    res.status(200).json({
+      success: true,
+      message: 'System cleanup completed successfully'
+    });
+
+  } catch (error) {
+    logger.error('Error during system cleanup', {
+      error: error.message
+    });
+
+    if (error instanceof AppError) {
+      return res.status(error.statusCode).json({
+        success: false,
+        error: error.message
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error'
     });
   }
 });

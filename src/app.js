@@ -15,6 +15,9 @@ import { requestLogger } from './middlewares/requestLogger.js';
 import gpsRoutes from './controllers/gpsController.js';
 import healthRoutes from './controllers/healthController.js';
 
+// Import new modular service
+import GpsProcessingService from './services/GpsProcessingService.js';
+
 // Initialize express app
 const app = express();
 
@@ -45,37 +48,67 @@ app.use(globalLimiter);
 
 // Routes
 app.use('/api/gps', gpsRoutes);
-//app.use('/health', healthRoutes);
-//app.use('/metrics', healthRoutes);
+app.use('/health', healthRoutes);
+app.use('/metrics', healthRoutes);
 
 // Error handling
 app.use(notFoundHandler);
 app.use(errorHandler);
 
+// Initialize GPS Processing Service
+async function initializeServices() {
+  try {
+    await GpsProcessingService.initialize();
+    logger.info('All services initialized successfully');
+  } catch (error) {
+    logger.error('Failed to initialize services', {
+      error: error.message,
+      stack: error.stack
+    });
+    process.exit(1);
+  }
+}
+
 // Graceful shutdown
-process.on('SIGTERM', async () => {
-  logger.info('SIGTERM received, shutting down gracefully');
-  await redisClient.quit();
-  process.exit(0);
-});
+async function gracefulShutdown(signal) {
+  logger.info(`${signal} received, shutting down gracefully`);
+  
+  try {
+    // Shutdown GPS Processing Service first
+    await GpsProcessingService.shutdown();
+    
+    // Then close Redis connection
+    await redisClient.quit();
+    
+    logger.info('Graceful shutdown completed');
+    process.exit(0);
+  } catch (error) {
+    logger.error('Error during graceful shutdown', {
+      error: error.message,
+      stack: error.stack
+    });
+    process.exit(1);
+  }
+}
 
-process.on('SIGINT', async () => {
-  logger.info('SIGINT received, shutting down gracefully');
-  await redisClient.quit();
-  process.exit(0);
-});
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
-const PORT = config.port || 3000;
+const PORT = config.server?.port || config.port || 3000;
 
-app.listen(PORT, () => {
+// Start server and initialize services
+app.listen(PORT, async () => {
   logger.info(`GPS Receiver Service running on port ${PORT}`, {
     port: PORT,
-    environment: config.nodeEnv,
+    environment: config.environment || config.nodeEnv,
     redis: {
       host: config.redis.host,
       port: config.redis.port
     }
   });
+  
+  // Initialize services after server starts
+  await initializeServices();
 });
 
 export default app;
