@@ -1,0 +1,41 @@
+# Configuración de Prometheus para GPS Receiver Service
+# Optimizado para despliegue con Redis externo
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'gps-receiver-monitor'
+
+rule_files:
+  - "alerts.yml"
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+scrape_configs:
+  # GPS Receiver Service (principal)
+  - job_name: 'gps-receiver-service'
+    static_configs:
+      - targets: ['localhost:9090']  # Usando host network
+    metrics_path: /metrics
+    scrape_interval: 10s
+    scrape_timeout: 5s
+    honor_labels: true
+    params:
+      format: ['prometheus']
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9091']  # Puerto de Prometheus
+    scrape_interval: 30s
+
+  # Sistema operativo (si node_exporter está instalado)
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['localhost:9100']
+    scrape_interval: 15s
+    metrics_path: /metrics

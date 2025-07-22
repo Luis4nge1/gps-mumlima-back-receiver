@@ -1,0 +1,116 @@
+# Alertas para GPS Receiver Service
+groups:
+- name: gps-service-alerts
+  rules:
+  # Servicio caído
+  - alert: GPSServiceDown
+    expr: up{job="gps-receiver-service"} == 0
+    for: 1m
+    labels:
+      severity: critical
+      service: gps-receiver
+    annotations:
+      summary: "GPS Receiver Service está caído"
+      description: "El servicio GPS Receiver ha estado caído por más de 1 minuto"
+      runbook_url: "https://wiki.company.com/runbooks/gps-service-down"
+
+  # Alta tasa de errores
+  - alert: HighErrorRate
+    expr: rate(gps_errors_total[5m]) / rate(gps_positions_received_total[5m]) > 0.05
+    for: 2m
+    labels:
+      severity: warning
+      service: gps-receiver
+    annotations:
+      summary: "Alta tasa de errores en procesamiento GPS"
+      description: "La tasa de errores es {{ $value | humanizePercentage }} en los últimos 5 minutos"
+
+  # Conexión Redis perdida
+  - alert: RedisConnectionLost
+    expr: gps_redis_connected == 0
+    for: 30s
+    labels:
+      severity: critical
+      service: gps-receiver
+    annotations:
+      summary: "Conexión a Redis perdida"
+      description: "El servicio GPS ha perdido la conexión con Redis"
+
+  # Alto uso de memoria
+  - alert: HighMemoryUsage
+    expr: gps_memory_usage_bytes / 1024 / 1024 / 1024 > 1.5
+    for: 5m
+    labels:
+      severity: warning
+      service: gps-receiver
+    annotations:
+      summary: "Alto uso de memoria"
+      description: "El uso de memoria es {{ $value | humanize }}GB"
+
+  # Colas con backlog alto
+  - alert: HighQueueBacklog
+    expr: gps_queue_jobs_waiting > 1000
+    for: 3m
+    labels:
+      severity: warning
+      service: gps-receiver
+    annotations:
+      summary: "Alto backlog en colas"
+      description: "Hay {{ $value }} jobs esperando en las colas"
+
+  # Latencia alta de procesamiento
+  - alert: HighProcessingLatency
+    expr: histogram_quantile(0.95, rate(gps_processing_duration_seconds_bucket[5m])) > 0.1
+    for: 2m
+    labels:
+      severity: warning
+      service: gps-receiver
+    annotations:
+      summary: "Alta latencia de procesamiento"
+      description: "El percentil 95 de latencia es {{ $value }}s"
+
+  # Pocos dispositivos activos (posible problema)
+  - alert: LowActiveDevices
+    expr: gps_active_devices < 10
+    for: 10m
+    labels:
+      severity: info
+      service: gps-receiver
+    annotations:
+      summary: "Pocos dispositivos activos"
+      description: "Solo {{ $value }} dispositivos están enviando datos"
+
+  # Redis con poco espacio
+  - alert: RedisHighMemoryUsage
+    expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.8
+    for: 5m
+    labels:
+      severity: warning
+      service: redis
+    annotations:
+      summary: "Redis con alto uso de memoria"
+      description: "Redis está usando {{ $value | humanizePercentage }} de su memoria máxima"
+
+- name: business-alerts
+  rules:
+  # Muchos duplicados detectados
+  - alert: HighDuplicateRate
+    expr: rate(gps_duplicates_total[10m]) / rate(gps_positions_received_total[10m]) > 0.3
+    for: 5m
+    labels:
+      severity: info
+      service: gps-receiver
+    annotations:
+      summary: "Alta tasa de duplicados"
+      description: "{{ $value | humanizePercentage }} de las posiciones son duplicados"
+
+  # Dispositivos inactivos por mucho tiempo
+  - alert: DevicesInactive
+    expr: time() - gps_device_last_seen_timestamp > 3600
+    for: 0m
+    labels:
+      severity: info
+      service: gps-receiver
+    annotations:
+      summary: "Dispositivos inactivos"
+      description: "Dispositivo {{ $labels.device_id }} inactivo por más de 1 hora"
