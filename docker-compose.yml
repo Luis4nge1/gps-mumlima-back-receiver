@@ -18,6 +18,7 @@ services:
       - gps-mobile-network
     volumes:
       - ./logs:/app/logs
+
   networks:
     gps-mobile-network:
       driver: bridge

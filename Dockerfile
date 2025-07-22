@@ -21,4 +21,4 @@ RUN mkdir -p logs
 EXPOSE 3000
 
 # Iniciar aplicación
-CMD ["npm", "start"]
+CMD ["dumb-init", "npm", "start"]
