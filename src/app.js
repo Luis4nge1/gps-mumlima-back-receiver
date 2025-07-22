@@ -111,10 +111,11 @@ process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 const PORT = config.server?.port || config.port || 3000;
-const HOST = config.server?.host || config.host || 'localhost';
+const HOST = config.server?.host || config.host || '0.0.0.0';
 
 // Start server and initialize services
 app.listen(PORT, HOST, async () => {
+  console.log(`Escuchando en ${HOST}:${PORT}`);
   logger.info(`GPS Receiver Service running on port ${PORT}`, {
     port: PORT,
     environment: config.environment || config.nodeEnv,
