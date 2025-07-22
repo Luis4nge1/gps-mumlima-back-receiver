@@ -40,6 +40,7 @@ app.use(requestLogger);
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 1000, // limit each IP to 1000 requests per windowMs
+  //keyGenerator: (req) => req.body.deviceId,
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
@@ -50,6 +51,21 @@ app.use(globalLimiter);
 app.use('/api/gps', gpsRoutes);
 app.use('/health', healthRoutes);
 app.use('/metrics', healthRoutes);
+
+// Root endpoint
+app.get('/', (req, res) => {
+  res.json({
+    service: 'Vehicle GPS Service',
+    version: '1.0.0',
+    status: 'running',
+    description: 'Microservice for receiving and storing vehicle GPS coordinates',
+    endpoints: {
+      health: '/health',
+      metrics: '/metrics',
+      api: '/api/mobile'
+    }
+  });
+});
 
 // Error handling
 app.use(notFoundHandler);
@@ -101,6 +117,7 @@ app.listen(PORT, async () => {
   logger.info(`GPS Receiver Service running on port ${PORT}`, {
     port: PORT,
     environment: config.environment || config.nodeEnv,
+    service: 'vehicle-gps',
     redis: {
       host: config.redis.host,
       port: config.redis.port

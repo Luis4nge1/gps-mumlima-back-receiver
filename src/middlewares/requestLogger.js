@@ -13,6 +13,7 @@ const requestLogger = (req, res, next) => {
     ip: req.ip,
     userAgent: req.get('User-Agent'),
     contentLength: req.get('Content-Length'),
+    serice: "vehicle-gps",
     timestamp: new Date().toISOString()
   });
   
@@ -27,6 +28,7 @@ const requestLogger = (req, res, next) => {
       statusCode: res.statusCode,
       responseTime: `${responseTime}ms`,
       contentLength: res.get('Content-Length'),
+      service: "vehicle-gps",
       ip: req.ip
     });
     

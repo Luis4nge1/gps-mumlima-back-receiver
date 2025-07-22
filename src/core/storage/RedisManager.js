@@ -72,7 +72,7 @@ class RedisManager {
       if (compressedData) {
         pipeline.setex(
           `${this.prefixes.history}compressed:${batchId}`,
-          tttl, // TTL de 1 hora por defecto
+          ttl, // TTL de 1 hora por defecto
           compressedData.toString('base64')
         );
       }

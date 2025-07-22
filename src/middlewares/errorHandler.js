@@ -44,8 +44,9 @@ const errorHandler = (err, req, res, next) => {
   if (err.statusCode === 429) {
     return res.status(429).json({
       success: false,
-      error: 'Rate limit exceeded',
+      error: 'Vehicle Rate limit exceeded',
       message: err.message,
+      service: 'vehicle-gps',
       retryAfter: err.details?.retryAfter
     });
   }
@@ -53,6 +54,7 @@ const errorHandler = (err, req, res, next) => {
   res.status(error.statusCode || 500).json({
     success: false,
     error: error.message || 'Internal Server Error',
+    service: 'vehicle-gps',
     ...(process.env.NODE_ENV === 'development' && { 
       stack: error.stack,
       details: error.details 
@@ -69,7 +71,8 @@ const notFoundHandler = (req, res, next) => {
   logger.warn('Route not found', {
     path: req.originalUrl,
     method: req.method,
-    ip: req.ip
+    ip: req.ip,
+    servicec: "vehicle-gps"
   });
   
   const error = new AppError(message, 404);

@@ -36,6 +36,7 @@ class GpsProcessingService {
     try {
       // Inicializar QueueManager
       await QueueManager.initialize();
+      logger.info('QueueManager initialized successfully');
       
       this.isInitialized = true;
       logger.info('GpsProcessingService initialized successfully');

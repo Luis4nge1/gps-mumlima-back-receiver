@@ -7,7 +7,7 @@ const redisIOClient = new Redis({
   port: config.redis.port,
   password: config.redis.password,
   maxRetriesPerRequest: null, // Necesario para BullMQ
-  enableOfflineQueue: false
+  enableOfflineQueue: true
 });
 
 export default redisIOClient;

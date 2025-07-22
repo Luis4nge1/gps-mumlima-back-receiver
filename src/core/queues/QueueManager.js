@@ -401,6 +401,10 @@ class QueueManager {
    * Cierra todas las colas y workers
    */
   async shutdown() {
+    if (!this.isInitialized) {
+      return;
+    }
+    
     logger.info('Shutting down QueueManager');
 
     try {
