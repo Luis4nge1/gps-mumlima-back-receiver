@@ -6,12 +6,7 @@
   "type": "module",
   "scripts": {
     "start": "node src/app.js",
-    "dev": "nodemon src/app.js",
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "example": "node examples/usage-example.js",
-    "health": "curl -s http://localhost:3000/api/gps/health | jq",
-    "stats": "curl -s http://localhost:3000/api/gps/stats | jq",
-    "cleanup": "curl -X POST -s http://localhost:3000/api/gps/cleanup | jq"
+    "dev": "nodemon src/app.js"
   },
   "keywords": [
     "gps",
@@ -21,6 +16,7 @@
     "express"
   ],
   "author": "luis4nge1",
+  "github": "https://github.com/Luis4nge1",
   "license": "ISC",
   "dependencies": {
     "bullmq": "^5.56.4",
